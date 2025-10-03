@@ -33,6 +33,7 @@
             overflow: hidden;
             font-family: var(--px-font);
             color: var(--px-text);
+            /* Đã bỏ filter ở body */
         }
 
         #gameCanvas {
@@ -42,6 +43,8 @@
             inset: 0;
             image-rendering: pixelated;
         }
+        
+        /* Style đã được xóa - nền đen trắng sẽ được xử lý trong canvas */
 
         /* Scanline overlay */
         body::after {
@@ -282,7 +285,10 @@
         <div class="overlay-box" id="menuBox">
             <h1 style="margin:0 0 10px;font-size:40px;">SQUARE RUN</h1>
             <p>Space / ↑: Jump<br>↓: Crouch<br>P: Pause<br>Rocket: Fly free</p>
-            <button class="game-btn" id="startBtn">Play</button>
+            <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
+                <button class="game-btn" id="startBtn">Play</button>
+                <button class="game-btn" id="helpBtn">Hướng dẫn</button>
+            </div>
         </div>
         <div class="overlay-box hidden" id="gameOverBox">
             <h2 style="margin-top:0">Game Over</h2>
