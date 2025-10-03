@@ -144,6 +144,7 @@ const LS_CURRENT_USER_KEY = 'squareRunCurrentUser';
 let users = {};
 let currentUser = null;
 let runBossDefeated = false; // flag per run
+let gameFreezedFor304 = false; // freeze game khi hiển thị 304.png lần đầu
 
 function loadUsers() {
     try { users = JSON.parse(localStorage.getItem(LS_USERS_KEY) || '{}') || {}; } catch { users = {}; }
@@ -278,6 +279,9 @@ function hide304Item() {
 }
 
 function show304Fireworks() {
+    // Freeze game để người chơi không bị chướng ngại vật làm thua
+    gameFreezedFor304 = true;
+
     // Create full screen overlay with tint
     const overlay = document.createElement('div');
     overlay.id = 'fireworkOverlay';
@@ -297,10 +301,12 @@ function show304Fireworks() {
     container.style.cssText = `
         position: relative;
         width: 800px;
-        height: 800px;
+        height: 900px;
         display: flex;
         align-items: center;
         justify-content: center;
+        flex-direction: column;
+        gap: 30px;
     `;
 
     // Center 304 image - PHÓNG TO HÌNH!
@@ -316,6 +322,56 @@ function show304Fireworks() {
     `;
 
     container.appendChild(img304);
+
+    // Thêm dòng chữ chúc mừng bên dưới hình 304
+    const congratsText = document.createElement('div');
+    congratsText.textContent = 'Xin chúc mừng bạn đã nhận được ấn phẩm đặc biệt 30/4';
+    congratsText.style.cssText = `
+        position: relative;
+        color: #FFD700;
+        font-size: 32px;
+        font-weight: bold;
+        text-align: center;
+        text-shadow: 
+            0 0 15px rgba(255, 215, 0, 1),
+            0 0 25px rgba(255, 215, 0, 0.8),
+            0 0 35px rgba(255, 215, 0, 0.6),
+            3px 3px 6px rgba(0, 0, 0, 1);
+        z-index: 10000;
+        animation: textGlow 1.5s ease-in-out infinite;
+        max-width: 700px;
+        line-height: 1.4;
+        margin-top: 30px;
+        padding: 15px 20px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 10px;
+        border: 2px solid rgba(255, 215, 0, 0.5);
+    `;
+    container.appendChild(congratsText);
+
+    // Add glow animation for text
+    if (!document.getElementById('textGlow-style')) {
+        const glowStyle = document.createElement('style');
+        glowStyle.id = 'textGlow-style';
+        glowStyle.textContent = `
+            @keyframes textGlow {
+                0%, 100% { 
+                    text-shadow: 
+                        0 0 10px rgba(255, 215, 0, 0.8),
+                        0 0 20px rgba(255, 215, 0, 0.6),
+                        2px 2px 4px rgba(0, 0, 0, 0.8);
+                }
+                50% { 
+                    text-shadow: 
+                        0 0 20px rgba(255, 215, 0, 1),
+                        0 0 30px rgba(255, 215, 0, 0.8),
+                        0 0 40px rgba(255, 215, 0, 0.6),
+                        2px 2px 4px rgba(0, 0, 0, 0.8);
+                }
+            }
+        `;
+        document.head.appendChild(glowStyle);
+    }
 
     // Add pulse animation for 304 image - NHẤP NHÔ NHẸ NHÀNG HỚN
     if (!document.getElementById('pulse304-style')) {
@@ -418,6 +474,12 @@ function show304Fireworks() {
         });
         const pulseStyle = document.getElementById('pulse304-style');
         if (pulseStyle) document.head.removeChild(pulseStyle);
+        const glowStyle = document.getElementById('textGlow-style');
+        if (glowStyle) document.head.removeChild(glowStyle);
+
+        // Unfreeze game - trò chơi tiếp tục sau khi người chơi click
+        gameFreezedFor304 = false;
+
         showPopup(gameOverBox);
     });
 }
@@ -426,7 +488,7 @@ function resetCurrentUserData() {
         alert('Chưa đăng nhập!');
         return;
     }
-    const confirmed = confirm('Bạn có chắc muốn xóa toàn bộ lịch sử chơi và trạng thái vật phẩm 30/4?\n\nSau khi reset, bạn sẽ bắt đầu lại từ đầu.');
+    const confirmed = confirm('Bạn có chắc muốn xóa toàn bộ lịch sử chơi và trạng thái ấn phẩm 30/4?\n\nSau khi reset, bạn sẽ bắt đầu lại từ đầu.');
     if (!confirmed) return;
 
     // Reset user data
@@ -725,10 +787,8 @@ const BG_PIXEL = 2; // size of block for mountains/trees to keep pixel vibe
 // ================= UI LAYOUT CONFIG (pixel positions) =================
 // All key UI elements use these so you can tweak easily in one place.
 const UI_POS = {
-    // Difficulty toggle button (top-right primary)
-    diffToggle: { top: 120, right: 8 },
-    // Difficulty badge (under toggle)
-    diffBadge: { top: 160, right: 8 },
+    // Difficulty badge (top-right)
+    diffBadge: { top: 120, right: 8 },
     // Test tank button (for debugging) (placed further down)
     testTank: { top: 86, right: 8 }
 };
@@ -744,10 +804,6 @@ const OVERHEAD_FORCE_DUCK = true; // set false to revert higher placement
 const OVERHEAD_DUCK_CLEARANCE = 2; // pixels gap above crouched head
 
 function applyUIPositions() {
-    if (diffToggleBtn) {
-        diffToggleBtn.style.top = UI_POS.diffToggle.top + 'px';
-        diffToggleBtn.style.right = UI_POS.diffToggle.right + 'px';
-    }
     if (diffBadge) {
         diffBadge.style.top = UI_POS.diffBadge.top + 'px';
         diffBadge.style.right = UI_POS.diffBadge.right + 'px';
@@ -964,54 +1020,13 @@ if (!diffBadge) {
     diffBadge.style.borderRadius = '6px';
     diffBadge.style.zIndex = '50';
     diffBadge.style.pointerEvents = 'none';
+    diffBadge.style.display = 'none'; // Ẩn khung HARD
     diffBadge.textContent = 'HARD';
     diffBadge.style.top = UI_POS.diffBadge.top + 'px';
     diffBadge.style.right = UI_POS.diffBadge.right + 'px';
     document.body.appendChild(diffBadge);
 }
 function updateDifficultyBadge() { if (diffBadge) diffBadge.textContent = difficulty.toUpperCase(); }
-
-// On–screen difficulty toggle button (user can change only when not actively playing)
-let diffToggleBtn = document.getElementById('difficultyToggleBtn');
-if (!diffToggleBtn) {
-    diffToggleBtn = document.createElement('button');
-    diffToggleBtn.id = 'difficultyToggleBtn';
-    diffToggleBtn.textContent = 'ĐỘ KHÓ: HARD';
-    Object.assign(diffToggleBtn.style, {
-        position: 'fixed',
-        padding: '6px 14px',
-        background: '#2e2e2e',
-        color: '#fff',
-        fontFamily: 'monospace',
-        fontSize: '13px',
-        border: '1px solid #858585',
-        borderRadius: '6px',
-        zIndex: 60,
-        cursor: 'pointer',
-        letterSpacing: '0.5px'
-    });
-    diffToggleBtn.style.top = UI_POS.diffToggle.top + 'px';
-    diffToggleBtn.style.right = UI_POS.diffToggle.right + 'px';
-    document.body.appendChild(diffToggleBtn);
-}
-
-function syncDifficultyButton() {
-    if (diffToggleBtn) diffToggleBtn.textContent = 'ĐỘ KHÓ: ' + difficulty.toUpperCase();
-}
-
-if (diffToggleBtn) {
-    diffToggleBtn.addEventListener('click', () => {
-        if (gameState === 'menu' || gameState === 'paused' || gameState === 'gameover') {
-            difficulty = (difficulty === 'hard') ? 'easy' : 'hard';
-            updateDifficultyBadge();
-            syncDifficultyButton();
-        } else {
-            // Optional tiny feedback flash when attempting during play
-            diffToggleBtn.style.transform = 'scale(0.92)';
-            setTimeout(() => diffToggleBtn.style.transform = '', 120);
-        }
-    });
-}
 
 // Help button on menu opens the instruction overlay
 if (helpBtn) {
@@ -1083,6 +1098,7 @@ function hide(el) { if (el) el.classList.add('hidden'); }
 
 function resetGame() {
     runBossDefeated = false; // reset boss flag for this run
+    gameFreezedFor304 = false; // reset freeze flag
 
     // RESET BACKGROUND TO DARK FOREST (grayscale mode)
     window.gameUsesColor = false;
@@ -2680,6 +2696,11 @@ function drawBossAttacks() {
 }
 
 function onBossHitPlayer() {
+    // Không gây sát thương nếu đang hiển thị bảng hướng dẫn
+    if (bossHelpBox && !bossHelpBox.classList.contains('hidden')) {
+        return; // Không xử lý sát thương khi người chơi chưa bấm BẮT ĐẦU
+    }
+
     // Trong boss battle, luôn tính sát thương (mọi buff hỗ trợ đã được xóa khi vào boss)
     if (player.shieldCharges > 0) {
         // Vẫn trừ 1 lớp khiên nếu còn, nhưng vẫn nhận sát thương nhẹ để tránh bất tử
@@ -3052,14 +3073,14 @@ function drawBackground() {
 
     // Trước khi hạ boss: Rừng cổ thụ u ám với ánh sáng huyền bí
     if (!window.gameUsesColor) {
-        // Sky - Dark at top, golden glow at horizon (like the image!)
+        // Sky - Dark at top matching tree grayscale, golden glow at horizon
         const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.7);
-        skyGrad.addColorStop(0, '#0a0f0f');    // Almost black top
-        skyGrad.addColorStop(0.2, '#1a2828');  // Very dark teal
-        skyGrad.addColorStop(0.5, '#2d4a45');  // Dark green-teal
-        skyGrad.addColorStop(0.7, '#4a6d55');  // Forest green
-        skyGrad.addColorStop(0.85, '#6d9060'); // Light green
-        skyGrad.addColorStop(1, '#a8c070');    // Golden-green glow!
+        skyGrad.addColorStop(0, '#1a1a1aff');    // Dark gray like tree shadows
+        skyGrad.addColorStop(0.2, '#1b1b1bff');  // Gray
+        skyGrad.addColorStop(0.5, '#1e1e1eff');  // Medium gray
+        skyGrad.addColorStop(0.7, '#415244ff');  // Lighter gray
+        skyGrad.addColorStop(0.85, '#4b5e4aff'); // Light gray
+        skyGrad.addColorStop(1, '#637864ff');    // Muted gray glow
         ctx.fillStyle = skyGrad;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -3153,15 +3174,17 @@ function drawBackground() {
 
         // Large ancient foreground trees - MORE DETAIL!
         const treeSpacing = 260;
-        const numMainTrees = Math.ceil(canvas.width / treeSpacing) + 2; // FIX: Dynamic count
+        const scrollOffset = distance * 0.2;
+        const startIndex = Math.floor(scrollOffset / treeSpacing);
+        const numMainTrees = Math.ceil(canvas.width / treeSpacing) + 2;
 
         for (let i = 0; i < numMainTrees; i++) {
-            const scrollOffset = (distance * 0.2) % treeSpacing;
-            const x = i * treeSpacing - scrollOffset - treeSpacing; // FIX: Proper continuous scrolling
+            const treeIndex = startIndex + i;
+            const x = treeIndex * treeSpacing - scrollOffset;
 
             if (x < -200 || x > canvas.width + 80) continue; // Skip if way off screen
 
-            const idx = i % 6; // Use modulo for variety
+            const idx = treeIndex % 6; // Use modulo for variety with consistent pattern
             const treeH = 200 + Math.sin(idx * 1.7) * 50;
             const treeW = 42 + Math.cos(idx * 2.3) * 12;
             const baseY = GROUND_Y + PLAYER_SIZE;
@@ -3341,13 +3364,12 @@ function drawBackground() {
         return; // Bỏ qua phần màu sắc rực rỡ cho đến khi hạ boss
     }
 
-    // Sau khi hạ boss: nền màu phong phú
-    const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    const stops = SKY_GRADIENT_COLORS.length - 1;
-    SKY_GRADIENT_COLORS.forEach((col, i) => {
-        g.addColorStop(i / stops, col);
-    });
-    ctx.fillStyle = g;
+    // Sau khi hạ boss: Bầu trời xanh sáng đẹp như ảnh!
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.6);
+    skyGrad.addColorStop(0, '#87ceeb');    // Sky blue sáng
+    skyGrad.addColorStop(0.4, '#a8d8f0'); // Xanh nhạt hơn
+    skyGrad.addColorStop(1, '#c8e6f5');   // Gần trắng ở horizon
+    ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const horizonY = GROUND_Y + PLAYER_SIZE - 40; // baseline for farthest mountains
@@ -3395,7 +3417,7 @@ function drawBackground() {
         }
     });
 
-    // Tall background trees (behind clouds but in front of mountains?) -> we draw before clouds so clouds drift over
+    // Tall background trees
     const treeBaseY = GROUND_Y + PLAYER_SIZE;
     const treeSpan = TREE_LAYER.spacing;
     const treeOffset = (distance * TREE_LAYER.speed) % treeSpan;
@@ -3426,50 +3448,102 @@ function drawBackground() {
     for (let x = -treeSpan; x < canvas.width + treeSpan; x += treeStep) {
         const baseX = x - treeOffset + treeSpan;
         const seed = Math.sin((baseX + distance) * 0.0021);
-        const trunkH = 120 + (seed * 0.5 + 0.5) * 80; // 120-200
-        const trunkW = 14 + (seed * 0.5 + 0.5) * 6;
-        // Trunk with pixel shading
+        const treeIdx = Math.floor(baseX / treeSpan); // Để táo ở vị trí cố định
+
+        // Thân cây to đều
+        const trunkH = 60; // To đều, không dần to
+        const trunkW = 12;
         const trunkColor = window.gameUsesColor ? TREE_LAYER.trunkColor : window.treeGrayColors.trunk;
         const trunkShade = displayHex(shadeHex(TREE_LAYER.trunkColor, -0.15));
-        const trunkLight = displayHex(shadeHex(TREE_LAYER.trunkColor, 0.12));
         const trunkX = Math.round(baseX);
         const trunkY = Math.round(treeBaseY - trunkH);
-        const trunkWpx = Math.round(trunkW);
-        const trunkHpx = Math.round(trunkH);
-        ctx.fillStyle = trunkColor;
-        ctx.fillRect(trunkX, trunkY, trunkWpx, trunkHpx);
-        // Bark stripes
-        ctx.fillStyle = trunkShade;
-        for (let yy = trunkY + BG_PIXEL * 2; yy < treeBaseY - BG_PIXEL * 2; yy += BG_PIXEL * 5) {
-            ctx.fillRect(trunkX + BG_PIXEL, yy, trunkWpx - BG_PIXEL * 2, BG_PIXEL);
-        }
-        // Light center
-        ctx.fillStyle = trunkLight;
-        ctx.fillRect(trunkX + Math.floor(trunkWpx / 2) - BG_PIXEL, trunkY, 2 * BG_PIXEL, trunkHpx);
-        // Layered canopies (3 tiers)
-        const canopyLevels = 3;
-        for (let c = 0; c < canopyLevels; c++) {
-            const tierY = treeBaseY - trunkH + c * (trunkH / canopyLevels * 0.35);
-            const tierW = trunkW * 3.2 + (canopyLevels - c) * 18;
-            const leafBase = window.gameUsesColor ? TREE_LAYER.leafColors[c % TREE_LAYER.leafColors.length] : window.treeGrayColors.leaves[c % window.treeGrayColors.leaves.length];
-            const leafShade = displayHex(shadeHex(window.gameUsesColor ? TREE_LAYER.leafColors[c % TREE_LAYER.leafColors.length] : toGrayHex(TREE_LAYER.leafColors[c % TREE_LAYER.leafColors.length]), -0.12));
-            const cx = trunkX + trunkWpx / 2;
-            const tierTop = Math.round(tierY - 22);
-            const stepH = BG_PIXEL * 3;
-            const steps = 5;
-            for (let s = 0; s < steps; s++) {
-                const w = Math.round((tierW - s * 8) / BG_PIXEL) * BG_PIXEL;
-                const y = tierTop + s * stepH;
-                ctx.fillStyle = leafBase;
-                ctx.fillRect(Math.round(cx - w / 2), y, w, stepH);
-                // shadow line
-                ctx.fillStyle = leafShade;
-                ctx.fillRect(Math.round(cx - w / 2), y + stepH - BG_PIXEL, w, BG_PIXEL);
-            }
-        }
-    }
 
-    // Enlarged pixel clouds (already moved in init) -- draw after trees so clouds appear in front
+        // Vẽ thân cây
+        ctx.fillStyle = trunkColor;
+        ctx.fillRect(trunkX, trunkY, trunkW, trunkH);
+        ctx.fillStyle = trunkShade;
+        ctx.fillRect(trunkX, trunkY, 2, trunkH);
+
+        // Vẽ tán lá hình tròn bồng bềnh (giống ảnh)
+        const canopySize = 85; // To đều, không dần to
+        const canopyCenterX = trunkX + trunkW / 2;
+        const canopyCenterY = trunkY - canopySize / 2 + 10;
+
+        if (window.gameUsesColor) {
+            // Vẽ tán lá xanh (nhiều hình tròn chồng lên nhau tạo hình bồng bềnh)
+            const leafColor1 = '#5ab55e'; // Xanh lá chính
+            const leafColor2 = '#4a9d4e'; // Xanh đậm hơn
+            const leafColor3 = '#6bc96f'; // Xanh sáng
+
+            // Layer 1 - bóng (xanh đậm)
+            ctx.fillStyle = leafColor2;
+            // Tròn giữa lớn
+            ctx.beginPath();
+            ctx.arc(canopyCenterX, canopyCenterY, canopySize * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Layer 2 - màu chính (vẽ nhiều tròn tạo hình bồng bềnh)
+            ctx.fillStyle = leafColor1;
+            // Tròn trên
+            ctx.beginPath();
+            ctx.arc(canopyCenterX, canopyCenterY - canopySize * 0.25, canopySize * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+            // Tròn trái
+            ctx.beginPath();
+            ctx.arc(canopyCenterX - canopySize * 0.3, canopyCenterY, canopySize * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+            // Tròn phải
+            ctx.beginPath();
+            ctx.arc(canopyCenterX + canopySize * 0.3, canopyCenterY, canopySize * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+            // Tròn giữa (đè lên)
+            ctx.beginPath();
+            ctx.arc(canopyCenterX, canopyCenterY, canopySize * 0.45, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Layer 3 - highlight (xanh sáng)
+            ctx.fillStyle = leafColor3;
+            ctx.beginPath();
+            ctx.arc(canopyCenterX - canopySize * 0.15, canopyCenterY - canopySize * 0.2, canopySize * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Vẽ trái táo đỏ CỐ ĐỊNH (dùng treeIdx để táo luôn ở cùng vị trí)
+            const applePositions = [
+                { dx: -canopySize * 0.2, dy: -canopySize * 0.15 },
+                { dx: canopySize * 0.25, dy: -canopySize * 0.1 },
+                { dx: 0, dy: canopySize * 0.15 },
+                { dx: -canopySize * 0.3, dy: canopySize * 0.25 }
+            ];
+
+            // Mỗi cây có 3-4 táo ở vị trí cố định
+            const numApples = 3 + (treeIdx % 2);
+            for (let a = 0; a < numApples; a++) {
+                const pos = applePositions[a];
+                const appleX = canopyCenterX + pos.dx;
+                const appleY = canopyCenterY + pos.dy;
+                const appleSize = 6;
+
+                // Táo đỏ
+                ctx.fillStyle = '#e74c3c';
+                ctx.beginPath();
+                ctx.arc(appleX, appleY, appleSize / 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Highlight
+                ctx.fillStyle = '#ff6b6b';
+                ctx.beginPath();
+                ctx.arc(appleX - 1, appleY - 1, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else {
+            // Chế độ grayscale - vẽ tán lá xám
+            const leafGray = window.treeGrayColors.leaves[0];
+            ctx.fillStyle = leafGray;
+            ctx.beginPath();
+            ctx.arc(canopyCenterX, canopyCenterY, canopySize * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }    // Enlarged pixel clouds (draw beautiful white clouds)
     cloudLayers.forEach(layer => {
         for (let cl of layer) {
             cl.x -= cl.speed;
@@ -3523,22 +3597,78 @@ function drawBackground() {
 
     // ===== HIỆU ỨNG ĐẶC BIỆT SAU KHI HẠ BOSS: REDFLAG VÀ STAR BAY LƠ LỬNG =====
     if (window.gameUsesColor && runBossDefeated) {
+        // Vẽ ánh sáng mặt trời (giống background ban đầu)
+        const lightCenterX = canvas.width * 0.35 + Math.sin(distance * 0.003) * 30;
+        const lightCenterY = canvas.height * 0.4;
+
+        // Outer glow - yellow-green (đậm hơn để nhìn rõ)
+        const outerGlow = ctx.createRadialGradient(lightCenterX, lightCenterY, 0,
+            lightCenterX, lightCenterY, 300);
+        outerGlow.addColorStop(0, 'rgba(255, 250, 200, 0.25)');    // Tăng từ 0.15 lên 0.25
+        outerGlow.addColorStop(0.3, 'rgba(255, 240, 150, 0.15)');  // Tăng từ 0.08 lên 0.15
+        outerGlow.addColorStop(0.6, 'rgba(255, 230, 120, 0.08)');  // Tăng từ 0.04 lên 0.08
+        outerGlow.addColorStop(1, 'rgba(255, 220, 100, 0)');
+        ctx.fillStyle = outerGlow;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Core bright spot (đậm hơn)
+        const coreGlow = ctx.createRadialGradient(lightCenterX, lightCenterY, 0,
+            lightCenterX, lightCenterY, 80);
+        coreGlow.addColorStop(0, 'rgba(255, 255, 220, 0.4)');      // Tăng từ 0.25 lên 0.4
+        coreGlow.addColorStop(0.5, 'rgba(255, 250, 180, 0.2)');    // Tăng từ 0.12 lên 0.2
+        coreGlow.addColorStop(1, 'rgba(255, 240, 150, 0)');
+        ctx.fillStyle = coreGlow;
+        ctx.fillRect(lightCenterX - 80, lightCenterY - 80, 160, 160);
+
+        // Volumetric light rays (đậm hơn)
+        const rayCount = 8;
+        for (let r = 0; r < rayCount; r++) {
+            const angle = (Math.PI * 2 * r / rayCount) + distance * 0.001;
+            const rayLen = 250 + Math.sin(distance * 0.01 + r) * 50;
+            const rayWidth = 40 + Math.sin(r * 2.3) * 20;
+
+            const x1 = lightCenterX;
+            const y1 = lightCenterY;
+            const x2 = lightCenterX + Math.cos(angle) * rayLen;
+            const y2 = lightCenterY + Math.sin(angle) * rayLen;
+
+            const rayGrad = ctx.createLinearGradient(x1, y1, x2, y2);
+            rayGrad.addColorStop(0, 'rgba(255, 250, 200, 0.15)');   // Tăng từ 0.08 lên 0.15
+            rayGrad.addColorStop(0.4, 'rgba(255, 240, 150, 0.08)'); // Tăng từ 0.04 lên 0.08
+            rayGrad.addColorStop(1, 'rgba(255, 230, 120, 0)');
+
+            ctx.fillStyle = rayGrad;
+            ctx.beginPath();
+            const perpX = -Math.sin(angle);
+            const perpY = Math.cos(angle);
+            ctx.moveTo(x1 + perpX * rayWidth / 2, y1 + perpY * rayWidth / 2);
+            ctx.lineTo(x1 - perpX * rayWidth / 2, y1 - perpY * rayWidth / 2);
+            ctx.lineTo(x2 - perpX * (rayWidth * 0.3), y2 - perpY * (rayWidth * 0.3));
+            ctx.lineTo(x2 + perpX * (rayWidth * 0.3), y2 + perpY * (rayWidth * 0.3));
+            ctx.closePath();
+            ctx.fill();
+        }
+
         // Initialize decoration particles on first frame after boss defeated
         if (!window.bossDefeatedDecorations) {
             window.bossDefeatedDecorations = [];
-            // Create floating flags and stars
+            // Create floating flags and stars - 15 particles rải rác đều
             for (let i = 0; i < 15; i++) {
                 const isFlag = Math.random() > 0.6;
+                // Chia màn hình thành lưới 5x3 để rải đều
+                const gridX = (i % 5) * (canvas.width / 5) + Math.random() * (canvas.width / 5);
+                const gridY = Math.floor(i / 5) * ((GROUND_Y - 200) / 3) + Math.random() * ((GROUND_Y - 200) / 3);
+
                 window.bossDefeatedDecorations.push({
                     type: isFlag ? 'flag' : 'star',
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * (GROUND_Y - 50),
-                    speedX: (Math.random() - 0.5) * 0.8,
-                    speedY: (Math.random() - 0.5) * 0.5,
-                    rotation: Math.random() * 360,
-                    rotationSpeed: (Math.random() - 0.5) * 2,
-                    scale: 0.5 + Math.random() * 0.8,
-                    opacity: 0.6 + Math.random() * 0.4
+                    x: gridX,
+                    y: gridY,
+                    speedX: (Math.random() - 0.5) * 0.4,
+                    speedY: (Math.random() - 0.5) * 0.25,
+                    rotation: 0, // Không xoay, giữ góc ban đầu
+                    rotationSpeed: 0, // Không xoay
+                    scale: 0.8 + Math.random() * 0.6, // Nhỏ hơn: 0.8-1.4 (thay vì 1.2-2.2)
+                    opacity: 0.7 + Math.random() * 0.3
                 });
             }
         }
@@ -3550,25 +3680,25 @@ function drawBackground() {
         starImg.src = 'pixel png/star.png';
 
         window.bossDefeatedDecorations.forEach(deco => {
-            // Update position
+            // Update position - chậm hơn
             deco.x += deco.speedX;
-            deco.y += deco.speedY + Math.sin(distance * 0.05 + deco.x * 0.1) * 0.3;
-            deco.rotation += deco.rotationSpeed;
+            deco.y += deco.speedY + Math.sin(distance * 0.03 + deco.x * 0.1) * 0.2;
+            // Không cập nhật rotation vì rotationSpeed = 0
 
             // Wrap around screen
             if (deco.x < -50) deco.x = canvas.width + 50;
             if (deco.x > canvas.width + 50) deco.x = -50;
-            if (deco.y < -50) deco.y = GROUND_Y;
+            if (deco.y < -50) deco.y = GROUND_Y - 200; // Reset về vùng cao
             if (deco.y > GROUND_Y) deco.y = -50;
 
-            // Draw
+            // Draw - giữ nguyên góc
             ctx.save();
             ctx.globalAlpha = deco.opacity;
             ctx.translate(deco.x, deco.y);
-            ctx.rotate(deco.rotation * Math.PI / 180);
+            // Không rotate nữa
 
             const img = deco.type === 'flag' ? flagImg : starImg;
-            const size = 25 * deco.scale;
+            const size = 30 * deco.scale; // Nhỏ hơn: từ 40 xuống 30
             ctx.drawImage(img, -size / 2, -size / 2, size, size);
 
             ctx.restore();
@@ -3679,7 +3809,8 @@ function gameLoop(ts) {
 
         // Chỉ cập nhật vị trí và sinh chướng ngại vật nếu không phải trong boss battle
         // hoặc boss đã bị đánh bại
-        if (!player.isBossBattle || (boss && boss.isDefeated && boss.defeatedTimer === 0)) {
+        // THÊM: Không cập nhật khi đang hiển thị 304.png (gameFreezedFor304)
+        if (!gameFreezedFor304 && (!player.isBossBattle || (boss && boss.isDefeated && boss.defeatedTimer === 0))) {
             updateObstacles();
             updateItems();
             // (đạn và hạt đã cập nhật ở trên để không bị đứng yên trong boss battle)
@@ -3761,11 +3892,34 @@ function gameLoop(ts) {
 
 // Controls
 window.addEventListener('keydown', e => {
-    // Difficulty toggle key: KeyD cycles easy<->hard while not playing or when paused
-    if (e.code === 'KeyD' && (gameState === 'menu' || gameState === 'paused' || gameState === 'gameover')) {
-        difficulty = difficulty === 'hard' ? 'easy' : 'hard';
-        updateDifficultyBadge();
-        syncDifficultyButton();
+    // SECRET KEY: Press A to instantly unlock color mode (post-boss state) for testing
+    if (e.code === 'KeyA' && gameState === 'playing') {
+        window.gameUsesColor = true;
+        player.useAltDino = true;
+        runBossDefeated = true; // Kích hoạt hiệu ứng redflag và star
+        // Unlock 304 item if user is logged in
+        if (currentUser && users[currentUser] && !users[currentUser].has304Unlocked) {
+            unlock304ForCurrentUser();
+            show304RewardOnScreen();
+        }
+    }
+    // SECRET KEY: Press B to test boss with 20HP remaining
+    if (e.code === 'KeyB' && gameState === 'playing') {
+        // Start boss battle if not already in it
+        if (!player.isBossBattle && !boss) {
+            // Clear all support effects
+            clearSupportEffectsForBoss();
+            // Initialize boss
+            createBoss();
+            player.isBossBattle = true;
+            // Set boss HP to 20 for testing
+            bossHealthBar.current = 20;
+            console.log("Test: Boss battle started with 20 HP");
+        } else if (boss && !boss.isDefeated) {
+            // If boss already exists, just set HP to 20
+            bossHealthBar.current = 20;
+            console.log("Test: Boss HP set to 20");
+        }
     }
     if (gameState === 'menu' && (e.code === 'Space' || e.code === 'Enter')) {
         startGame();
@@ -3925,9 +4079,6 @@ testBtn.addEventListener('click', () => {
     }
     setTestButtonLabel();
 });
-
-// Ensure initial sync for difficulty button
-syncDifficultyButton();
 
 resetGame();
 draw();
