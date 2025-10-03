@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Square Dino Game</title>
+    <style>
+        :root {
+            --px-bg: #1d1d21;
+            --px-panel: #2b2f34;
+            --px-panel-border: #ffffff;
+            --px-accent: #ffcc33;
+            --px-accent-alt: #ff8844;
+            --px-text: #f5f5f5;
+            --px-danger: #ff5555;
+            --px-good: #4fc3f7;
+            --px-font: 'Courier New', monospace;
+            --px-scanline-alpha: 0.08;
+            --px-shadow: 0 0 0 2px #000, 0 0 0 3px #ffffff22;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--px-bg);
+            margin: 0;
+            overflow: hidden;
+            font-family: var(--px-font);
+            color: var(--px-text);
+        }
+
+        #gameCanvas {
+            background: #111;
+            display: block;
+            position: absolute;
+            inset: 0;
+            image-rendering: pixelated;
+        }
+
+        /* Scanline overlay */
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background: repeating-linear-gradient(to bottom,
+                    rgba(255, 255, 255, var(--px-scanline-alpha)) 0 2px,
+                    transparent 2px 4px);
+            mix-blend-mode: overlay;
+        }
+
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            pointer-events: none;
+        }
+
+        .panel {
+            background: var(--px-panel);
+            border: 2px solid var(--px-panel-border);
+            padding: 6px 14px 8px;
+            border-radius: 4px;
+            pointer-events: auto;
+            box-shadow: var(--px-shadow);
+        }
+
+        .panel h1,
+        .panel h2,
+        .panel p {
+            margin: 0;
+        }
+
+        #buffIndicator {
+            margin-left: 8px;
+            letter-spacing: 2px;
+        }
+
+        #buffBars {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .buff-bar {
+            width: 170px;
+            height: 14px;
+            background: #000;
+            border: 2px solid #fff;
+            position: relative;
+            overflow: hidden;
+            image-rendering: pixelated;
+        }
+
+        .buff-bar .label {
+            position: absolute;
+            left: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            text-shadow: 1px 1px #000;
+        }
+
+        .buff-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0%;
+            transition: width .18s linear;
+            /* smooth linear depletion */
+        }
+
+        /* Low / critical warning overlays */
+        .buff-bar.low .buff-fill::after,
+        .buff-bar.critical .buff-fill::after {
+            content: attr(data-remaining);
+            position: absolute;
+            right: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 10px;
+            color: #fff;
+            text-shadow: 1px 1px #000;
+            opacity: 0.9;
+        }
+
+        .buff-bar.low {
+            box-shadow: 0 0 0 2px #ffe27a inset;
+        }
+
+        .buff-bar.critical {
+            box-shadow: 0 0 0 2px var(--px-danger) inset;
+        }
+
+        .buff-bar.critical .buff-fill {
+            filter: brightness(1.1) contrast(1.1);
+            animation: flashCrit .6s linear infinite;
+        }
+
+        @keyframes flashCrit {
+
+            0%,
+            60% {
+                opacity: 1;
+            }
+
+            70% {
+                opacity: .4;
+            }
+
+            80% {
+                opacity: 1;
+            }
+
+            90% {
+                opacity: .4;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .buff-rocket .buff-fill {
+            background: repeating-linear-gradient(90deg, #ffbb55 0 10px, #ffaa22 10px 20px);
+        }
+
+        .buff-magnet .buff-fill {
+            background: repeating-linear-gradient(90deg, #f1c40f 0 10px, #d39c00 10px 20px);
+        }
+
+        .buff-slow .buff-fill {
+            background: repeating-linear-gradient(90deg, #b27ad6 0 10px, #8245a8 10px 20px);
+        }
+
+        .buff-glide .buff-fill {
+            background: repeating-linear-gradient(90deg, #9bd7ff 0 10px, #6bb6ec 10px 20px);
+        }
+
+        .buff-tank .buff-fill {
+            background: repeating-linear-gradient(90deg, #8f8f8f 0 10px, #5e5e5e 10px 20px);
+        }
+
+        .hidden-bar {
+            display: none;
+        }
+
+        #centerOverlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .overlay-box {
+            background: rgba(20, 20, 24, .92);
+            border: 2px solid #fff;
+            padding: 26px 38px;
+            border-radius: 6px;
+            max-width: 480px;
+            pointer-events: auto;
+            box-shadow: var(--px-shadow);
+        }
+
+        .overlay-box h1,
+        .overlay-box h2 {
+            font-family: var(--px-font);
+            letter-spacing: 2px;
+        }
+
+        button.game-btn {
+            font-family: var(--px-font);
+            padding: 10px 26px;
+            font-size: 15px;
+            border: 2px solid #fff;
+            background: #222;
+            color: var(--px-text);
+            cursor: pointer;
+            border-radius: 4px;
+            box-shadow: 0 3px 0 #000;
+            position: relative;
+            transition: transform .1s;
+        }
+
+        button.game-btn:hover {
+            background: #333;
+        }
+
+        button.game-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #000;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="hud">
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+            <div class="panel" id="leftInfo">Distance: <span id="distance">0</span> m <span id="buffIndicator"></span>
+            </div>
+            <div id="buffBars">
+                <div id="barRocket" class="buff-bar buff-rocket hidden-bar">
+                    <div class="buff-fill"></div><span class="label">🚀</span>
+                </div>
+                <div id="barMagnet" class="buff-bar buff-magnet hidden-bar">
+                    <div class="buff-fill"></div><span class="label">🧲</span>
+                </div>
+                <div id="barSlow" class="buff-bar buff-slow hidden-bar">
+                    <div class="buff-fill"></div><span class="label">⏳</span>
+                </div>
+                <div id="barGlide" class="buff-bar buff-glide hidden-bar">
+                    <div class="buff-fill"></div><span class="label">✈️</span>
+                </div>
+                <div id="barTank" class="buff-bar buff-tank hidden-bar">
+                    <div class="buff-fill"></div><span class="label">🪖</span>
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;">
+            <button class="game-btn panel" id="pauseBtn" style="padding:8px 16px;cursor:pointer;">⏸ Pause</button>
+            <div class="panel" id="rightInfo">Best: <span id="bestScore">0</span></div>
+        </div>
+    </div>
+    <div id="centerOverlay">
+        <div class="overlay-box" id="menuBox">
+            <h1 style="margin:0 0 10px;font-size:40px;">SQUARE RUN</h1>
+            <p>Space / ↑: Jump<br>↓: Crouch<br>P: Pause<br>Rocket: Fly free</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:4px;">
+                <button class="game-btn" id="startBtn">Play</button>
+                <button class="game-btn" id="createAccountBtn">Tạo tài khoản</button>
+                <button class="game-btn" id="loginBtn">Đăng nhập</button>
+                <button class="game-btn hidden" id="logoutBtn">Đăng xuất</button>
+            </div>
+            <div id="currentUserDisplay" style="margin-top:10px;font-size:14px;text-align:center;"></div>
+        </div>
+        <!-- Popup: Create Account -->
+        <div class="overlay-box hidden" id="createAccountBox">
+            <h2 style="margin-top:0">Tạo tài khoản</h2>
+            <form id="createAccountForm" style="display:flex;flex-direction:column;gap:10px;min-width:260px;">
+                <label style="display:flex;flex-direction:column;font-size:13px;gap:4px;">Tên người chơi
+                    <input id="caUsername" type="text" required maxlength="20"
+                        style="padding:6px 8px;border:2px solid #fff;background:#111;color:#fff;border-radius:4px;font-family:var(--px-font);">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:13px;gap:4px;">Mật khẩu
+                    <input id="caPassword" type="password" required minlength="3" maxlength="32"
+                        style="padding:6px 8px;border:2px solid #fff;background:#111;color:#fff;border-radius:4px;font-family:var(--px-font);">
+                </label>
+                <div id="caError" style="color:var(--px-danger);font-size:12px;min-height:16px;"></div>
+                <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">
+                    <button type="button" class="game-btn" id="caCancelBtn">Hủy</button>
+                    <button type="submit" class="game-btn" id="caSubmitBtn">Tạo</button>
+                </div>
+            </form>
+        </div>
+        <!-- Popup: Login -->
+        <div class="overlay-box hidden" id="loginBox">
+            <h2 style="margin-top:0">Đăng nhập</h2>
+            <form id="loginForm" style="display:flex;flex-direction:column;gap:10px;min-width:260px;">
+                <label style="display:flex;flex-direction:column;font-size:13px;gap:4px;">Tên người chơi
+                    <input id="liUsername" type="text" required maxlength="20"
+                        style="padding:6px 8px;border:2px solid #fff;background:#111;color:#fff;border-radius:4px;font-family:var(--px-font);">
+                </label>
+                <label style="display:flex;flex-direction:column;font-size:13px;gap:4px;">Mật khẩu
+                    <input id="liPassword" type="password" required minlength="3" maxlength="32"
+                        style="padding:6px 8px;border:2px solid #fff;background:#111;color:#fff;border-radius:4px;font-family:var(--px-font);">
+                </label>
+                <div id="liError" style="color:var(--px-danger);font-size:12px;min-height:16px;"></div>
+                <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">
+                    <button type="button" class="game-btn" id="liCancelBtn">Hủy</button>
+                    <button type="submit" class="game-btn" id="liSubmitBtn">Vào game</button>
+                </div>
+            </form>
+        </div>
+        <div class="overlay-box hidden" id="gameOverBox">
+            <h2 style="margin-top:0">Game Over</h2>
+            <p>Distance: <span id="finalDistance">0</span> m</p>
+            <div style="display:flex;flex-direction:column;gap:10px;align-items:center;">
+                <button class="game-btn" id="restartBtn">Restart</button>
+                <button class="game-btn" id="showHistoryBtn">Lịch sử</button>
+                <button class="game-btn" id="show304Btn">Vật phẩm 30/4</button>
+            </div>
+        </div>
+        <!-- Popup: History -->
+        <div class="overlay-box hidden" id="historyBox" style="max-width:600px;">
+            <h2 style="margin-top:0">Lịch sử </h2>
+            <div id="historyContent" style="max-height:400px;overflow-y:auto;margin:10px 0;">
+                <p id="historyEmptyMsg" style="text-align:center;color:#888;">Chưa có lịch sử</p>
+                <table id="historyTable" style="width:100%;border-collapse:collapse;display:none;">
+                    <thead>
+                        <tr style="background:#333;border-bottom:2px solid #fff;">
+                            <th style="padding:8px;text-align:left;font-size:13px;">Ngày</th>
+                            <th style="padding:8px;text-align:right;font-size:13px;">Distance (m)</th>
+                            <th style="padding:8px;text-align:center;font-size:13px;">Boss</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <!-- Rows will be populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div style="display:flex;justify-content:center;gap:10px;margin-top:10px;">
+                <button class="game-btn" id="historyBackBtn">Back</button>
+                <button class="game-btn" id="resetDataBtn" style="background:#8b0000;">Reset dữ liệu</button>
+            </div>
+        </div>
+        <!-- Popup: 304 Item -->
+        <div class="overlay-box hidden" id="item304Box" style="max-width:500px;">
+            <h2 style="margin-top:0;text-align:center;">Vật phẩm 30/4</h2>
+            <div id="item304Content" style="text-align:center;padding:20px 0;">
+                <!-- Locked message or unlocked image will be shown here -->
+            </div>
+            <div style="display:flex;justify-content:center;margin-top:10px;">
+                <button class="game-btn" id="item304BackBtn">Back</button>
+            </div>
+        </div>
+        <div class="overlay-box hidden" id="pauseBox">
+            <h2 style="margin-top:0">⏸ Game Paused</h2>
+            <p style="margin:10px 0;">Chọn hành động:</p>
+            <div style="display:flex;flex-direction:column;gap:10px;align-items:center;">
+                <button class="game-btn" id="resumeBtn">▶️ Chơi tiếp</button>
+                <button class="game-btn" id="pauseRestartBtn">🔄 Restart</button>
+                <button class="game-btn" id="pauseMenuBtn">🏠 Về trang chủ</button>
+            </div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+
+</html>
